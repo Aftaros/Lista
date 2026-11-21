@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dzienna checklista</title>
+<style>
+  :root {
+    --purple: #6d4aff;
+    --purple-light: #efeaff;
+    --green: #34c759;
+    --bg: #f6f5fa;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --muted: #8a8aa0;
+    --border: #e6e4ef;
+    --danger: #ff5b5b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .app { width: 100%; max-width: 520px; }
+  header { text-align: center; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 700; }
+  .date { color: var(--muted); font-size: 14px; margin-top: 4px; text-transform: capitalize; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .progress-wrap { display: flex; align-items: center; gap: 12px; }
+  .progress-bar { flex: 1; height: 10px; background: var(--purple-light); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--purple); border-radius: 999px; transition: width .3s ease; }
+  .progress-label { font-size: 14px; font-weight: 600; min-width: 56px; text-align: right; }
+
+  .stats { display: flex; gap: 12px; text-align: center; }
+  .stat { flex: 1; }
+  .stat b { display: block; font-size: 20px; color: var(--purple); }
+  .stat span { font-size: 12px; color: var(--muted); }
+
+  .dots { display: flex; justify-content: space-between; margin-top: 14px; }
+  .day-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--border); }
+  .dot.done { background: var(--green); }
+  .dot.partial { background: var(--purple-light); border: 2px solid var(--purple); }
+  .dot.today { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+  ul.list { list-style: none; }
+  li.item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--border);
+    transition: opacity .2s;
+  }
+  li.item:last-child { border-bottom: none; }
+  li.item .custom-check {
+    width: 24px; height: 24px; flex-shrink: 0;
+    border: 2px solid var(--purple);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #fff; font-weight: 700;
+    transition: background .15s;
+    user-select: none;
+  }
+  li.item.done .custom-check { background: var(--green); border-color: var(--green); }
+  li.item .label { flex: 1; font-size: 15px; line-height: 1.4; cursor: pointer; }
+  li.item.done .label { color: var(--muted); text-decoration: line-through; }
+  li.item .del {
+    background: none; border: none; color: var(--muted);
+    font-size: 17px; cursor: pointer; padding: 4px 8px;
+    visibility: hidden; border-radius: 8px;
+  }
+  li.item:hover .del { visibility: visible; }
+  li.item .del:hover { color: var(--danger); background: var(--bg); }
+
+  .add-row { display: flex; gap: 10px; margin-top: 14px; }
+  .add-row input {
+    flex: 1; padding: 12px 14px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: 12px;
+    outline: none; background: var(--bg);
+  }
+  .add-row input:focus { border-color: var(--purple); background: #fff; }
+  .add-row button {
+    padding: 12px 18px; font-size: 15px; font-weight: 600;
+    background: var(--purple); color: #fff; border: none;
+    border-radius: 12px; cursor: pointer;
+  }
+  .add-row button:hover { filter: brightness(1.08); }
+
+  .footer-note { text-align: center; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .all-done { text-align: center; color: var(--green); font-weight: 600; padding: 8px 0 2px; display: none; }
+
+  .reset-link {
+    display: block; margin: 4px auto 0; background: none; border: none;
+    color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline;
+  }
+  .reset-link:hover { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>✅ Dzienna checklista</h1>
+    <div class="date" id="dateLabel"></div>
+  </header>
+
+  <div class="card">
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="fill" style="width:0%"></div></div>
+      <div class="progress-label" id="pct">0%</div>
+    </div>
+    <div class="all-done" id="allDone">🎉 Wszystko odhaczone!</div>
+  </div>
+
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><b id="statDone">0</b><span>Zrobione dziś</span></div>
+      <div class="stat"><b id="statStreak">0</b><span>Passa (dni)</span></div>
+      <div class="stat"><b id="statPerfect">0</b><span>Idealne dni</span></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <div class="card">
+    <ul class="list" id="list"></ul>
+    <div class="add-row">
+      <input type="text" id="newItem" placeholder="Dodaj nową pozycję…" autocomplete="off">
+      <button id="addBtn">Dodaj</button>
+    </div>
+    <button class="reset-link" id="resetBtn">wyczyść odhaczenie na dziś</button>
+  </div>
+
+  <p class="footer-note">Zapisywane lokalnie w tej przeglądarce • ta sama lista codziennie</p>
+</div>
+
+<script>
+(function () {
+  const LS_ITEMS = "checklist.items.v1";
+  const LS_DONE  = "checklist.done.v1";
+  const DAYS_PL = ["niedziela","poniedziałek","wtorek","środa","czwartek","piątek","sobota"];
+  const MONTHS_PL = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
+
+  function todayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+  function shiftDays(n) {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d;
+  }
+
+  let items = JSON.parse(localStorage.getItem(LS_ITEMS) || "[]");
+  let done  = JSON.parse(localStorage.getItem(LS_DONE)  || "{}");
+
+  function saveItems() { localStorage.setItem(LS_ITEMS, JSON.stringify(items)); }
+  function saveDone()  { localStorage.setItem(LS_DONE, JSON.stringify(done)); }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function render() {
+    const tk = todayKey();
+    const todaysDone = done[tk] || [];
+
+    // date label
+    const d = new Date();
+    document.getElementById("dateLabel").textContent =
+      DAYS_PL[d.getDay()] + ", " + d.getDate() + " " + MONTHS_PL[d.getMonth()] + " " + d.getFullYear();
+
+    // list
+    const ul = document.getElementById("list");
+    ul.innerHTML = "";
+    items.forEach(function (it) {
+      const isDone = todaysDone.indexOf(it.id) !== -1;
+      const li = document.createElement("li");
+      li.className = "item" + (isDone ? " done" : "");
+
+      const check = document.createElement("div");
+      check.className = "custom-check";
+      check.textContent = isDone ? "✓" : "";
+      check.onclick = function () { toggle(it.id); };
+
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = it.text;
+      label.onclick = function () { toggle(it.id); };
+
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "✕";
+      del.title = "Usuń pozycję";
+      del.onclick = function () {
+        if (confirm("Usunąć „" + it.text + "” z listy?")) {
+          items = items.filter(function (x) { return x.id !== it.id; });
+          saveItems(); render();
+        }
+      };
+
+      li.appendChild(check); li.appendChild(label); li.appendChild(del);
+      ul.appendChild(li);
+    });
+
+    // progress
+    const total = items.length, doneCount = todaysDone.filter(function (id) {
+      return items.some(function (it) { return it.id === id; });
+    }).length;
+    const pct = total ? Math.round(doneCount / total * 100) : 0;
+    document.getElementById("fill").style.width = pct + "%";
+    document.getElementById("pct").textContent = doneCount + "/" + total + " • " + pct + "%";
+    document.getElementById("allDone").style.display = (total > 0 && doneCount === total) ? "block" : "none";
+
+    // stats
+    document.getElementById("statDone").textContent = doneCount;
+
+    let streak = 0;
+    for (let i = 0; i < 3650; i++) {
+      const k = todayKey(shiftDays(-i));
+      const dd = done[k];
+      if (i > 0 && dd && items.length > 0 &&
+          items.every(function (it) { return dd.indexOf(it.id) !== -1; })) {
+        streak++;
+      } else if (i > 0) { break; }
+    }
+    document.getElementById("statStreak").textContent = streak;
+
+    let perfect = 0;
+    Object.keys(done).forEach(function (k) {
+      if (done[k].length >= items.length && items.length > 0 &&
+          items.every(function (it) { return done[k].indexOf(it.id) !== -1; })) {
+        perfect++;
+      }
+    });
+    document.getElementById("statPerfect").textContent = perfect;
+
+    // 14-day dots
+    const dotsEl = document.getElementById("dots");
+    dotsEl.innerHTML = "";
+    for (let i = 13; i >= 0; i--) {
+      const dd = shiftDays(-i);
+      const k = todayKey(dd);
+      const rec = done[k] || [];
+      const cnt = rec.filter(function (id) {
+        return items.some(function (it) { return it.id === id; });
+      }).length;
+      const wrap = document.createElement("div");
+      wrap.className = "day-dot";
+      const dot = document.createElement("div");
+      dot.className = "dot" +
+        (cnt === total && total > 0 ? " done" : cnt > 0 ? " partial" : "") +
+        (i === 0 ? " today" : "");
+      const lab = document.createElement("span");
+      lab.textContent = dd.getDate();
+      wrap.appendChild(dot); wrap.appendChild(lab);
+      dotsEl.appendChild(wrap);
+    }
+  }
+
+  function toggle(id) {
+    const tk = todayKey();
+    const arr = done[tk] || [];
+    const idx = arr.indexOf(id);
+    if (idx === -1) arr.push(id); else arr.splice(idx, 1);
+    done[tk] = arr;
+    saveDone(); render();
+  }
+
+  function addItem() {
+    const inp = document.getElementById("newItem");
+    const text = inp.value.trim();
+    if (!text) return;
+    items.push({ id: uid(), text: text });
+    saveItems();
+    inp.value = "";
+    render();
+    inp.focus();
+  }
+
+  document.getElementById("addBtn").onclick = addItem;
+  document.getElementById("newItem").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") addItem();
+  });
+  document.getElementById("resetBtn").onclick = function () {
+    if (confirm("Wyczyścić wszystkie odhaczenia na dziś?")) {
+      delete done[todayKey()];
+      saveDone(); render();
+    }
+  };
+
+  if (items.length === 0) {
+    ["Wstać o czasie 🌅", "Wyjść ze sztangi 💪", "Skonsumować co najmniej 1 warp 🐱"].forEach(function (t) {
+      items.push({ id: uid(), text: t });
+    });
+    saveItems();
+  }
+  render();
+})();
+</script>
+</body>
+</html>
